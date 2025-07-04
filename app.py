@@ -130,7 +130,11 @@ if st.session_state.view == 'technical':
 
                 data['20DMA'] = data['Close'].rolling(window=20).mean()
                 data['50DMA'] = data['Close'].rolling(window=50).mean()
-                st.line_chart(data[['Close', '20DMA', '50DMA']])
+                ma_data = data[['Close', '20DMA', '50DMA']].dropna()
+                if not ma_data.empty:
+                    st.line_chart(ma_data)
+                else:
+                    st.warning("Not enough data to plot moving averages yet.")
 
                 # RSI
                 delta = data['Close'].diff()
