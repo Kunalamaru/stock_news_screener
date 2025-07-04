@@ -4,6 +4,7 @@ import requests
 from bs4 import BeautifulSoup
 from textblob import TextBlob
 import re
+from collections import defaultdict, Counter
 
 st.set_page_config(page_title="📈 Smart Stock News Analyzer", layout="wide")
 st.title("📊 Impact-Based Nifty Stock News Screener")
@@ -31,7 +32,8 @@ IMPACT_WEIGHTS = {
 }
 
 def fetch_news(sources, stock_list):
-    all_news = []
+    raw_news = []
+    seen_headlines = defaultdict(list)
     for name, url in sources.items():
         try:
             r = requests.get(url, timeout=10)
@@ -44,11 +46,19 @@ def fetch_news(sources, stock_list):
                 for stock in stock_list:
                     pattern = r"\b" + re.escape(stock) + r"\b"
                     if re.search(pattern, text_upper):
-                        all_news.append((stock, text, name, full_link))
+                        seen_headlines[text].append((stock, name, full_link))
                         break
         except Exception as e:
             st.error(f"Error fetching from {name}: {e}")
-    return list(set(all_news))
+
+    consolidated_news = []
+    for headline, entries in seen_headlines.items():
+        stock_sources = set(entry[1] for entry in entries)
+        stock = entries[0][0]
+        source = ", ".join(stock_sources)
+        link = entries[0][2]
+        consolidated_news.append((stock, headline, source, link, len(stock_sources)))
+    return consolidated_news
 
 def classify_impact(headline):
     headline_lower = headline.lower()
@@ -67,10 +77,12 @@ def analyze_news(news_items):
     results = []
     max_score_seen = 0
 
-    for stock, headline, source, link in news_items:
+    for stock, headline, source, link, source_count in news_items:
         sentiment = TextBlob(headline).sentiment.polarity
         impact_cat, impact_weight = classify_impact(headline)
-        raw_score = round(sentiment * 0.3 + impact_weight * 0.7, 4)
+
+        adjusted_weight = min(impact_weight + (0.05 * (source_count - 1)), 1.0)  # boost for multiple sources
+        raw_score = round(sentiment * 0.3 + adjusted_weight * 0.7, 4)
         max_score_seen = max(max_score_seen, raw_score)
 
         results.append({
@@ -78,10 +90,11 @@ def analyze_news(news_items):
             "Headline": headline,
             "Sentiment": round(sentiment, 2),
             "Impact Category": impact_cat,
-            "Impact Weight": impact_weight,
+            "Impact Weight": adjusted_weight,
             "Raw Score": raw_score,
             "Source": source,
             "Link": link,
+            "Sources Count": source_count,
             "Summary": summarize_text(headline)
         })
 
@@ -109,7 +122,8 @@ if st.button("🔍 Analyze News (Impact & Sentiment)"):
                     st.write(f"**Summary:** {news['Summary']}")
                     st.write(f"**Sentiment Score:** {news['Sentiment']}")
                     st.write(f"**Impact Category:** {news['Impact Category']} (Weight: {news['Impact Weight']})")
+                    st.write(f"**Reported By:** {news['Sources Count']} source(s): {news['Source']}")
                     st.write(f"**Scoring Formula:** `0.3 × Sentiment + 0.7 × Impact Weight = {news['Raw Score']}`")
-                    st.write(f"**Source:** [{news['Source']}]({news['Link']})")
+                    st.write(f"**Source:** [{news['Source'].split(',')[0]}]({news['Link']})")
         else:
             st.warning("No impactful news found today.")
