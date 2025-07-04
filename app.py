@@ -8,12 +8,16 @@ from collections import defaultdict
 import yfinance as yf
 import matplotlib.pyplot as plt
 import numpy as np
+from streamlit_autorefresh import st_autorefresh
 
 st.set_page_config(page_title="📈 Smart Stock News Analyzer", layout="wide")
 
 # Initialize session state to handle view switching
 if 'view' not in st.session_state:
     st.session_state.view = 'news'
+
+if 'auto_refresh' not in st.session_state:
+    st.session_state.auto_refresh = False
 
 @st.cache_data
 def load_stocks():
@@ -116,10 +120,14 @@ stock_list = load_stocks()
 
 st.sidebar.header("📌 Technical Analysis")
 stock_input = st.sidebar.text_input("Enter stock symbol (e.g., INFY.NS):")
+st.session_state.auto_refresh = st.sidebar.toggle("⟳ Auto Refresh (1 min)", value=st.session_state.auto_refresh)
 if st.sidebar.button("Generate Technical Analysis"):
     st.session_state.view = 'technical'
 
 if st.session_state.view == 'technical':
+    if st.session_state.auto_refresh:
+        st_autorefresh(interval=60000, key="autorefresh")
+
     st.title("📉 Technical Analysis")
     if stock_input:
         try:
@@ -127,14 +135,6 @@ if st.session_state.view == 'technical':
             if not data.empty:
                 st.subheader(f"Last 6 Months Price Chart for {stock_input.upper()}")
                 st.line_chart(data['Close'])
-
-                data['20DMA'] = data['Close'].rolling(window=20).mean()
-                data['50DMA'] = data['Close'].rolling(window=50).mean()
-                ma_data = data[['Close', '20DMA', '50DMA']].dropna()
-                if not ma_data.empty:
-                    st.line_chart(ma_data)
-                else:
-                    st.warning("Not enough data to plot moving averages yet.")
 
                 # RSI
                 delta = data['Close'].diff()
@@ -152,14 +152,13 @@ if st.session_state.view == 'technical':
                 data['Signal'] = data['MACD'].ewm(span=9).mean()
                 st.line_chart(data[['MACD', 'Signal']])
 
-                st.write("**Latest Close:**", round(data['Close'].iloc[-1], 2))
-                st.write("**20DMA:**", round(data['20DMA'].iloc[-1], 2))
-                st.write("**50DMA:**", round(data['50DMA'].iloc[-1], 2))
+                latest_macd = data['MACD'].iloc[-1]
+                latest_signal = data['Signal'].iloc[-1]
 
-                if data['20DMA'].iloc[-1] > data['50DMA'].iloc[-1]:
-                    st.success("Bullish Crossover: 20DMA > 50DMA")
+                if latest_macd > latest_signal:
+                    st.success("MACD Bullish Crossover Detected")
                 else:
-                    st.warning("Bearish Crossover: 20DMA < 50DMA")
+                    st.warning("MACD Bearish Crossover Detected")
             else:
                 st.warning("No data found for symbol")
         except Exception as e:
