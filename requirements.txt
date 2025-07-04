@@ -6,3 +6,4 @@ textblob
 yfinance
 matplotlib
 numpy
+streamlit-autorefresh
