@@ -1,0 +1,6 @@
+streamlit
+requests
+beautifulsoup4
+textblob
+python-telegram-bot==13.15
+pandas
