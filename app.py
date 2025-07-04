@@ -40,7 +40,99 @@ def load_stocks():
     df = pd.read_csv("nifty_stocks.csv", header=None)
     return df[0].str.strip().str.upper().tolist()
 
-# ... rest of unchanged setup code like NEWS_SOURCES, IMPACT_WEIGHTS, fetch_news, etc.
+# Define news sources and impact weights
+NEWS_SOURCES = [
+    "https://economictimes.indiatimes.com/markets/stocks/news",
+    "https://www.moneycontrol.com/news/business/stocks/",
+    "https://in.finance.yahoo.com/",
+    "https://www.bseindia.com/markets/MarketInfo/NoticesCirculars.aspx"
+]
+
+IMPACT_WEIGHTS = {
+    "contracts": 10,
+    "government": 9,
+    "investment": 9,
+    "merger": 9,
+    "profit": 8,
+    "upgrade": 8,
+    "record high": 7,
+    "raw material": 7,
+    "tariff": 7,
+    "bulk deal": 7,
+    "misc": 4
+}
+
+def fetch_news(sources, stock_names):
+    headlines = []
+    for url in sources:
+        try:
+            response = requests.get(url, timeout=10)
+            soup = BeautifulSoup(response.text, "html.parser")
+            for tag in soup.find_all(['a', 'h2', 'h3']):
+                text = tag.get_text(strip=True)
+                if any(stock in text.upper() for stock in stock_names):
+                    link = tag.get('href') or url
+                    headlines.append({
+                        "headline": text,
+                        "link": link,
+                        "source": url
+                    })
+        except Exception:
+            continue
+    return headlines
+
+def classify_impact(text):
+    impact = "misc"
+    for key in IMPACT_WEIGHTS:
+        if key in text.lower():
+            impact = key
+            break
+    return impact, IMPACT_WEIGHTS[impact]
+
+def get_rsi(symbol):
+    try:
+        df = yf.download(symbol, period='1mo')
+        delta = df['Close'].diff()
+        gain = delta.where(delta > 0, 0)
+        loss = -delta.where(delta < 0, 0)
+        avg_gain = gain.rolling(14).mean()
+        avg_loss = loss.rolling(14).mean()
+        rs = avg_gain / avg_loss
+        rsi = 100 - (100 / (1 + rs))
+        return round(rsi.iloc[-1], 2)
+    except:
+        return 50
+
+def analyze_news(raw):
+    results = []
+    seen = set()
+    for item in raw:
+        headline = item['headline']
+        source = item['source']
+        link = item['link']
+        for stock in stock_list:
+            if stock in headline.upper() and (headline, stock) not in seen:
+                seen.add((headline, stock))
+                sentiment = TextBlob(headline).sentiment.polarity
+                impact_cat, weight = classify_impact(headline)
+                rsi = get_rsi(stock + ".NS")
+                score = round(0.3 * sentiment + 0.7 * weight, 2)
+                results.append({
+                    "Stock": stock,
+                    "Headline": headline,
+                    "Summary": headline[:100] + "...",
+                    "Sentiment": round(sentiment, 2),
+                    "Impact Category": impact_cat,
+                    "Impact Weight": weight,
+                    "RSI": rsi,
+                    "Impact Score": score,
+                    "Raw Score": score,
+                    "Link": link,
+                    "Source": source,
+                    "Sources Count": 1
+                })
+    results.sort(key=lambda x: x['Impact Score'], reverse=True)
+    return results
 # Keep all functions like classify_impact, summarize_text, get_rsi, analyze_news unchanged
 
 stock_list = load_stocks()
