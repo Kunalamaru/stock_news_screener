@@ -3,6 +3,7 @@ import pandas as pd
 import requests
 from bs4 import BeautifulSoup
 from textblob import TextBlob
+import re
 
 st.set_page_config(page_title="📈 Smart Stock News Impact Screener", layout="centered")
 st.title("📈 Smart Nifty Stock News Impact Analyzer")
@@ -11,7 +12,7 @@ st.title("📈 Smart Nifty Stock News Impact Analyzer")
 @st.cache_data
 def load_stocks():
     df = pd.read_csv("nifty_stocks.csv", header=None)
-    return df[0].str.upper().tolist()
+    return df[0].str.strip().str.upper().tolist()
 
 # News sources
 NEWS_SOURCES = {
@@ -40,8 +41,12 @@ def fetch_news(sources, stock_list):
             soup = BeautifulSoup(r.content, "html.parser")
             for tag in soup.find_all(['h1', 'h2', 'h3', 'p']):
                 text = tag.get_text(strip=True)
-                if any(stock in text.upper() for stock in stock_list):
-                    all_news.append((text, name))
+                text_upper = text.upper()
+                for stock in stock_list:
+                    pattern = r"\b" + re.escape(stock) + r"\b"
+                    if re.search(pattern, text_upper):
+                        all_news.append((stock, text, name))
+                        break
         except Exception as e:
             st.error(f"Error fetching from {name}: {e}")
     return list(set(all_news))
@@ -53,34 +58,46 @@ def classify_impact(headline):
             return category, weight
     return "generic", 0.4  # fallback
 
-def analyze_news(news_items, stock_list):
+def analyze_news(news_items):
     results = []
-    for headline, source in news_items:
+    max_score_seen = 0
+
+    for stock, headline, source in news_items:
         sentiment = TextBlob(headline).sentiment.polarity
         impact_cat, impact_weight = classify_impact(headline)
-        impact_score = round(sentiment * 0.3 + impact_weight * 0.7, 3)
-        for stock in stock_list:
-            if stock in headline.upper():
-                results.append({
-                    "Stock": stock,
-                    "Headline": headline,
-                    "Sentiment": round(sentiment, 2),
-                    "Impact Category": impact_cat,
-                    "Impact Weight": impact_weight,
-                    "Impact Score": impact_score,
-                    "Source": source
-                })
+        raw_score = round(sentiment * 0.3 + impact_weight * 0.7, 4)
+        max_score_seen = max(max_score_seen, raw_score)
+
+        results.append({
+            "Stock": stock,
+            "Headline": headline,
+            "Sentiment": round(sentiment, 2),
+            "Impact Category": impact_cat,
+            "Impact Weight": impact_weight,
+            "Raw Score": raw_score,
+            "Source": source
+        })
+
+    # Normalize raw score to 0–10 scale
+    if max_score_seen > 0:
+        for r in results:
+            r["Impact Score"] = round((r["Raw Score"] / max_score_seen) * 10, 2)
+    else:
+        for r in results:
+            r["Impact Score"] = 0.0
+
     return results
 
-# Load stocks
+# Load stock list
 stock_list = load_stocks()
 
 if st.button("🔍 Analyze News (Impact & Sentiment)"):
     with st.spinner("Scanning headlines and analyzing..."):
         raw_news = fetch_news(NEWS_SOURCES, stock_list)
-        analyzed = analyze_news(raw_news, stock_list)
+        analyzed = analyze_news(raw_news)
+
         if analyzed:
-            df = pd.DataFrame(analyzed)
+            df = pd.DataFrame(analyzed).drop(columns=["Raw Score"])
             df_sorted = df.sort_values("Impact Score", ascending=False)
             st.success(f"{len(df_sorted)} impactful news items found.")
             st.dataframe(df_sorted, use_container_width=True)
