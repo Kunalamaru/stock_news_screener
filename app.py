@@ -62,6 +62,22 @@ IMPACT_WEIGHTS = {
     "misc": 4
 }
 
+@st.cache_data
+def load_historical_data():
+    try:
+        df = pd.read_csv("news_impact_history.csv")
+        return df
+    except:
+        return pd.DataFrame(columns=["impact_category", "actual_change"])
+
+def tune_weights(historical_df):
+    if len(historical_df) > 10:
+        means = historical_df.groupby("impact_category")["actual_change"].mean().to_dict()
+        for key in IMPACT_WEIGHTS:
+            if key in means:
+                IMPACT_WEIGHTS[key] = round(np.interp(means[key], [-5, 5], [4, 10]), 1)
+
+
 def fetch_news(sources, stock_names):
     headlines = []
     for url in sources:
@@ -117,8 +133,9 @@ def analyze_news(raw):
                 impact_cat, weight = classify_impact(headline)
                 rsi = get_rsi(stock + ".NS")
                 score = round(0.3 * sentiment + 0.7 * weight, 2)
+                color = '🟢' if score >= 8 else '🟡' if score >= 6 else '🔴'
                 results.append({
-                    "Stock": stock,
+                    "Color": color,
                     "Headline": headline,
                     "Summary": headline[:100] + "...",
                     "Sentiment": round(sentiment, 2),
@@ -198,6 +215,8 @@ elif st.session_state.view == 'news':
         analyzed = st.session_state.analyzed_news
     elif st.button("🔍 Analyze News (Impact & Sentiment)"):
         with st.spinner("Fetching and analyzing news..."):
+            history_df = load_historical_data()
+            tune_weights(history_df)
             raw_news = fetch_news(NEWS_SOURCES, stock_list)
             analyzed = analyze_news(raw_news)
             st.session_state.analyzed_news = analyzed
@@ -207,7 +226,8 @@ elif st.session_state.view == 'news':
     if analyzed:
         st.success(f"{len(analyzed)} news items found.")
         for news in analyzed:
-            with st.expander(f"📌 {news['Stock']} — Impact Score: {news['Impact Score']} — RSI: {news['RSI']}"):
+            label = f"{news['Color']} {news['Stock']} — Impact Score: {news['Impact Score']} — RSI: {news['RSI']}"
+            with st.expander(label):
                 st.write(f"**Headline:** {news['Headline']}")
                 st.write(f"**Summary:** {news['Summary']}")
                 st.write(f"**Sentiment Score:** {news['Sentiment']}")
