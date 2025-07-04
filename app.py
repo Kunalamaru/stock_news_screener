@@ -4,10 +4,16 @@ import requests
 from bs4 import BeautifulSoup
 from textblob import TextBlob
 import re
-from collections import defaultdict, Counter
+from collections import defaultdict
+import yfinance as yf
+import matplotlib.pyplot as plt
+import numpy as np
 
 st.set_page_config(page_title="📈 Smart Stock News Analyzer", layout="wide")
-st.title("📊 Impact-Based Nifty Stock News Screener")
+
+# Initialize session state to handle view switching
+if 'view' not in st.session_state:
+    st.session_state.view = 'news'
 
 @st.cache_data
 def load_stocks():
@@ -80,8 +86,7 @@ def analyze_news(news_items):
     for stock, headline, source, link, source_count in news_items:
         sentiment = TextBlob(headline).sentiment.polarity
         impact_cat, impact_weight = classify_impact(headline)
-
-        adjusted_weight = min(impact_weight + (0.05 * (source_count - 1)), 1.0)  # boost for multiple sources
+        adjusted_weight = min(impact_weight + (0.05 * (source_count - 1)), 1.0)
         raw_score = round(sentiment * 0.3 + adjusted_weight * 0.7, 4)
         max_score_seen = max(max_score_seen, raw_score)
 
@@ -109,21 +114,71 @@ def analyze_news(news_items):
 
 stock_list = load_stocks()
 
-if st.button("🔍 Analyze News (Impact & Sentiment)"):
-    with st.spinner("Fetching and analyzing news..."):
-        raw_news = fetch_news(NEWS_SOURCES, stock_list)
-        analyzed = analyze_news(raw_news)
+st.sidebar.header("📌 Technical Analysis")
+stock_input = st.sidebar.text_input("Enter stock symbol (e.g., INFY.NS):")
+if st.sidebar.button("Generate Technical Analysis"):
+    st.session_state.view = 'technical'
 
-        if analyzed:
-            st.success(f"{len(analyzed)} news items found.")
-            for news in analyzed:
-                with st.expander(f"📌 {news['Stock']} — Impact Score: {news['Impact Score']}"):
-                    st.write(f"**Headline:** {news['Headline']}")
-                    st.write(f"**Summary:** {news['Summary']}")
-                    st.write(f"**Sentiment Score:** {news['Sentiment']}")
-                    st.write(f"**Impact Category:** {news['Impact Category']} (Weight: {news['Impact Weight']})")
-                    st.write(f"**Reported By:** {news['Sources Count']} source(s): {news['Source']}")
-                    st.write(f"**Scoring Formula:** `0.3 × Sentiment + 0.7 × Impact Weight = {news['Raw Score']}`")
-                    st.write(f"**Source:** [{news['Source'].split(',')[0]}]({news['Link']})")
-        else:
-            st.warning("No impactful news found today.")
+if st.session_state.view == 'technical':
+    st.title("📉 Technical Analysis")
+    if stock_input:
+        try:
+            data = yf.download(stock_input, period="6mo", interval="1d")
+            if not data.empty:
+                st.subheader(f"Last 6 Months Price Chart for {stock_input.upper()}")
+                st.line_chart(data['Close'])
+
+                data['20DMA'] = data['Close'].rolling(window=20).mean()
+                data['50DMA'] = data['Close'].rolling(window=50).mean()
+                st.line_chart(data[['Close', '20DMA', '50DMA']])
+
+                # RSI
+                delta = data['Close'].diff()
+                gain = (delta.where(delta > 0, 0)).rolling(14).mean()
+                loss = (-delta.where(delta < 0, 0)).rolling(14).mean()
+                rs = gain / loss
+                data['RSI'] = 100 - (100 / (1 + rs))
+                st.line_chart(data['RSI'])
+                st.write(f"**RSI (latest):** {round(data['RSI'].iloc[-1], 2)}")
+
+                # MACD
+                data['EMA12'] = data['Close'].ewm(span=12).mean()
+                data['EMA26'] = data['Close'].ewm(span=26).mean()
+                data['MACD'] = data['EMA12'] - data['EMA26']
+                data['Signal'] = data['MACD'].ewm(span=9).mean()
+                st.line_chart(data[['MACD', 'Signal']])
+
+                st.write("**Latest Close:**", round(data['Close'].iloc[-1], 2))
+                st.write("**20DMA:**", round(data['20DMA'].iloc[-1], 2))
+                st.write("**50DMA:**", round(data['50DMA'].iloc[-1], 2))
+
+                if data['20DMA'].iloc[-1] > data['50DMA'].iloc[-1]:
+                    st.success("Bullish Crossover: 20DMA > 50DMA")
+                else:
+                    st.warning("Bearish Crossover: 20DMA < 50DMA")
+            else:
+                st.warning("No data found for symbol")
+        except Exception as e:
+            st.error(f"Error: {e}")
+    st.button("🔙 Back to News", on_click=lambda: st.session_state.update({'view': 'news'}))
+
+elif st.session_state.view == 'news':
+    st.title("📊 Impact-Based Nifty Stock News Screener")
+    if st.button("🔍 Analyze News (Impact & Sentiment)"):
+        with st.spinner("Fetching and analyzing news..."):
+            raw_news = fetch_news(NEWS_SOURCES, stock_list)
+            analyzed = analyze_news(raw_news)
+
+            if analyzed:
+                st.success(f"{len(analyzed)} news items found.")
+                for news in analyzed:
+                    with st.expander(f"📌 {news['Stock']} — Impact Score: {news['Impact Score']}"):
+                        st.write(f"**Headline:** {news['Headline']}")
+                        st.write(f"**Summary:** {news['Summary']}")
+                        st.write(f"**Sentiment Score:** {news['Sentiment']}")
+                        st.write(f"**Impact Category:** {news['Impact Category']} (Weight: {news['Impact Weight']})")
+                        st.write(f"**Reported By:** {news['Sources Count']} source(s): {news['Source']}")
+                        st.write(f"**Scoring Formula:** `0.3 × Sentiment + 0.7 × Impact Weight = {news['Raw Score']}`")
+                        st.write(f"**Source:** [{news['Source'].split(',')[0]}]({news['Link']})")
+            else:
+                st.warning("No impactful news found today.")
