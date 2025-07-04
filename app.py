@@ -4,10 +4,6 @@ import requests
 from bs4 import BeautifulSoup
 from textblob import TextBlob
 
-# Load Telegram credentials
-TELEGRAM_TOKEN = st.secrets["TELEGRAM"]["TOKEN"]
-CHAT_ID = st.secrets["TELEGRAM"]["CHAT_ID"]
-
 st.set_page_config(page_title="📈 Smart Stock News Impact Screener", layout="centered")
 st.title("📈 Smart Nifty Stock News Impact Analyzer")
 
@@ -76,19 +72,6 @@ def analyze_news(news_items, stock_list):
                 })
     return results
 
-def send_to_telegram(top_news):
-    if not top_news:
-        msg = "📭 No highly impactful stock news today."
-    else:
-        msg = "*📈 Top 10 Impactful Stocks from News*\n\n"
-        for row in top_news[:10]:
-            msg += f"🔹 *{row['Stock']}* — Impact Score: `{row['Impact Score']}`\n_{row['Headline']}_\n(Source: {row['Source']})\n\n"
-
-    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-    payload = {"chat_id": CHAT_ID, "text": msg, "parse_mode": "Markdown"}
-    res = requests.post(url, data=payload)
-    return res.ok
-
 # Load stocks
 stock_list = load_stocks()
 
@@ -101,14 +84,5 @@ if st.button("🔍 Analyze News (Impact & Sentiment)"):
             df_sorted = df.sort_values("Impact Score", ascending=False)
             st.success(f"{len(df_sorted)} impactful news items found.")
             st.dataframe(df_sorted, use_container_width=True)
-            st.session_state["df_top10"] = df_sorted.head(10).to_dict("records")
         else:
             st.warning("No impactful news found.")
-
-if "df_top10" in st.session_state:
-    if st.button("📤 Send Top 10 to Telegram"):
-        sent = send_to_telegram(st.session_state["df_top10"])
-        if sent:
-            st.success("✅ Report sent to Telegram.")
-        else:
-            st.error("❌ Failed to send message.")
