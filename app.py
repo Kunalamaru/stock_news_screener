@@ -5,16 +5,14 @@ from bs4 import BeautifulSoup
 from textblob import TextBlob
 import re
 
-st.set_page_config(page_title="📈 Smart Stock News Impact Screener", layout="centered")
-st.title("📈 Smart Nifty Stock News Impact Analyzer")
+st.set_page_config(page_title="📈 Smart Stock News Analyzer", layout="wide")
+st.title("📊 Impact-Based Nifty Stock News Screener")
 
-# Load stock list
 @st.cache_data
 def load_stocks():
     df = pd.read_csv("nifty_stocks.csv", header=None)
     return df[0].str.strip().str.upper().tolist()
 
-# News sources
 NEWS_SOURCES = {
     "Moneycontrol": "https://www.moneycontrol.com/news/business/stocks/",
     "Economic Times": "https://economictimes.indiatimes.com/markets/stocks/news",
@@ -22,7 +20,6 @@ NEWS_SOURCES = {
     "BSE India": "https://www.bseindia.com/markets/MarketInfo/NoticesCirculars.aspx"
 }
 
-# Impact categories with keywords and weights
 IMPACT_WEIGHTS = {
     "government": (["govt", "cabinet", "ministry", "policy change", "budget", "duty hike", "duty cut", "export tax", "import duty"], 0.9),
     "contract": (["bags order", "secures contract", "wins order", "award contract", "deal worth"], 0.85),
@@ -43,9 +40,9 @@ def fetch_news(sources, stock_list):
                 text = tag.get_text(strip=True)
                 text_upper = text.upper()
                 for stock in stock_list:
-                    pattern = r"\b" + re.escape(stock) + r"\b"
+                    pattern = r"\\b" + re.escape(stock) + r"\\b"
                     if re.search(pattern, text_upper):
-                        all_news.append((stock, text, name))
+                        all_news.append((stock, text, name, url))
                         break
         except Exception as e:
             st.error(f"Error fetching from {name}: {e}")
@@ -56,13 +53,17 @@ def classify_impact(headline):
     for category, (keywords, weight) in IMPACT_WEIGHTS.items():
         if any(keyword in headline_lower for keyword in keywords):
             return category, weight
-    return "generic", 0.4  # fallback
+    return "generic", 0.4
+
+def summarize_text(text):
+    blob = TextBlob(text)
+    return str(blob.sentences[0]) if blob.sentences else text
 
 def analyze_news(news_items):
     results = []
     max_score_seen = 0
 
-    for stock, headline, source in news_items:
+    for stock, headline, source, link in news_items:
         sentiment = TextBlob(headline).sentiment.polarity
         impact_cat, impact_weight = classify_impact(headline)
         raw_score = round(sentiment * 0.3 + impact_weight * 0.7, 4)
@@ -75,10 +76,11 @@ def analyze_news(news_items):
             "Impact Category": impact_cat,
             "Impact Weight": impact_weight,
             "Raw Score": raw_score,
-            "Source": source
+            "Source": source,
+            "Link": link,
+            "Summary": summarize_text(headline)
         })
 
-    # Normalize raw score to 0–10 scale
     if max_score_seen > 0:
         for r in results:
             r["Impact Score"] = round((r["Raw Score"] / max_score_seen) * 10, 2)
@@ -86,20 +88,25 @@ def analyze_news(news_items):
         for r in results:
             r["Impact Score"] = 0.0
 
-    return results
+    return sorted(results, key=lambda x: x["Impact Score"], reverse=True)
 
-# Load stock list
+# Load stocks
 stock_list = load_stocks()
 
 if st.button("🔍 Analyze News (Impact & Sentiment)"):
-    with st.spinner("Scanning headlines and analyzing..."):
+    with st.spinner("Fetching and analyzing news..."):
         raw_news = fetch_news(NEWS_SOURCES, stock_list)
         analyzed = analyze_news(raw_news)
 
         if analyzed:
-            df = pd.DataFrame(analyzed).drop(columns=["Raw Score"])
-            df_sorted = df.sort_values("Impact Score", ascending=False)
-            st.success(f"{len(df_sorted)} impactful news items found.")
-            st.dataframe(df_sorted, use_container_width=True)
+            st.success(f"{len(analyzed)} news items found.")
+            for news in analyzed:
+                with st.expander(f"📌 {news['Stock']} — Impact Score: {news['Impact Score']}"):
+                    st.write(f"**Headline:** {news['Headline']}")
+                    st.write(f"**Summary:** {news['Summary']}")
+                    st.write(f"**Sentiment Score:** {news['Sentiment']}")
+                    st.write(f"**Impact Category:** {news['Impact Category']} (Weight: {news['Impact Weight']})")
+                    st.write(f"**Scoring Formula:** `0.3 × Sentiment + 0.7 × Impact Weight = {news['Raw Score']}`")
+                    st.write(f"**Source:** [{news['Source']}]({news['Link']})")
         else:
-            st.warning("No impactful news found.")
+            st.warning("No impactful news found today.")
