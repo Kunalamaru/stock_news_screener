@@ -122,6 +122,6 @@ elif st.session_state.view == 'news':
                 st.write(f"**Impact Category:** {news['Impact Category']} (Weight: {news['Impact Weight']})")
                 st.write(f"**Reported By:** {news['Sources Count']} source(s): {news['Source']}")
                 st.write(f"**Scoring Formula:** `0.3 × Sentiment + 0.7 × Impact Weight = {news['Raw Score']}`")
-                st.write(f"**Source:** [{news['Source'].split(',')[0]}]({news['Link']})")})")
+                st.write(f"**Source:** [{news['Source'].split(',')[0]}]({news['Link']})")
     else:
         st.warning("No impactful news found today.")
