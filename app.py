@@ -146,14 +146,16 @@ if st.session_state.view == 'technical':
                 st.write(f"**RSI (latest):** {round(data['RSI'].iloc[-1], 2)}")
 
                 # MACD
-                data['EMA12'] = data['Close'].ewm(span=12).mean()
-                data['EMA26'] = data['Close'].ewm(span=26).mean()
+                data['EMA12'] = data['Close'].ewm(span=12, adjust=False).mean()
+                data['EMA26'] = data['Close'].ewm(span=26, adjust=False).mean()
                 data['MACD'] = data['EMA12'] - data['EMA26']
-                data['Signal'] = data['MACD'].ewm(span=9).mean()
-                st.line_chart(data[['MACD', 'Signal']])
+                data['Signal'] = data['MACD'].ewm(span=9, adjust=False).mean()
 
-                latest_macd = data['MACD'].iloc[-1]
-                latest_signal = data['Signal'].iloc[-1]
+                macd_chart = pd.DataFrame({"MACD": data['MACD'], "Signal": data['Signal']})
+                st.line_chart(macd_chart.dropna())
+
+                latest_macd = data['MACD'].dropna().iloc[-1]
+                latest_signal = data['Signal'].dropna().iloc[-1]
 
                 if latest_macd > latest_signal:
                     st.success("MACD Bullish Crossover Detected")
