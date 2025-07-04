@@ -1,5 +1,8 @@
 streamlit
+pandas
 requests
 beautifulsoup4
 textblob
-pandas
+yfinance
+matplotlib
+numpy
