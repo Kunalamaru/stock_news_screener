@@ -135,6 +135,7 @@ def analyze_news(raw):
                 score = round(0.3 * sentiment + 0.7 * weight, 2)
                 color = '🟢' if score >= 8 else '🟡' if score >= 6 else '🔴'
                 results.append({
+                    "Stock": stock,
                     "Color": color,
                     "Headline": headline,
                     "Summary": headline[:100] + "...",
