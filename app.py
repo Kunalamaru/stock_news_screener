@@ -235,12 +235,13 @@ elif st.session_state.view == 'news':
         st.success(f"{len(analyzed)} news items found.")
         for news in analyzed:
             try:
-            rsi = float(news['RSI'])
-            rsi_color = '🟢' if rsi > 70 else '🟡' if 30 <= rsi <= 70 else '🔴'
-        except:
-            rsi = "NA"
-            rsi_color = '⚪'
-        label = f"{news['Color']} {news['Stock']} — Impact Score: {news['Impact Score']} — {rsi_color} RSI = {rsi}"
+                rsi = float(news['RSI'])
+                rsi_color = '🟢' if rsi > 70 else '🟡' if 30 <= rsi <= 70 else '🔴'
+            except:
+                rsi = "NA"
+                rsi_color = '⚪'
+
+            label = f"{news['Color']} {news['Stock']} — Impact Score: {news['Impact Score']} — {rsi_color} RSI = {rsi}"
             with st.expander(label):
                 st.write(f"**Headline:** {news['Headline']}")
                 st.write(f"**Summary:** {news['Summary']}")
