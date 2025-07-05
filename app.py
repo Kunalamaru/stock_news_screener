@@ -80,19 +80,26 @@ def tune_weights(historical_df):
 
 def fetch_news(sources, stock_names):
     headlines = []
+    trusted_domains = ["economictimes.indiatimes.com", "moneycontrol.com", "in.finance.yahoo.com", "bseindia.com"]
+    min_headline_length = 50
     for url in sources:
         try:
             response = requests.get(url, timeout=10)
             soup = BeautifulSoup(response.text, "html.parser")
             for tag in soup.find_all(['a', 'h2', 'h3']):
                 text = tag.get_text(strip=True)
-                if any(stock in text.upper() for stock in stock_names):
-                    link = tag.get('href') or url
-                    headlines.append({
-                        "headline": text,
-                        "link": link,
-                        "source": url
-                    })
+                link = tag.get('href') or url
+                if not text or len(text) < min_headline_length:
+                    continue
+                if not any(stock == word for word in text.upper().split() for stock in stock_names):
+                    continue
+                if not any(domain in link for domain in trusted_domains):
+                    continue
+                headlines.append({
+                    "headline": text,
+                    "link": link,
+                    "source": url
+                })
         except Exception:
             continue
     return headlines
