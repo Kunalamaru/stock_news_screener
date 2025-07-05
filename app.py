@@ -239,7 +239,8 @@ if st.session_state.view == 'technical':
                 data['MACD'] = data['EMA12'] - data['EMA26']
                 data['Signal'] = data['MACD'].ewm(span=9, adjust=False).mean()
                 macd_chart = pd.DataFrame({"MACD": data['MACD'], "Signal": data['Signal']})
-                st.line_chart(macd_chart.dropna())
+                st.subheader("MACD vs Signal Line")
+                st.line_chart(macd_chart)
 
                 latest_macd = data['MACD'].dropna().iloc[-1]
                 latest_signal = data['Signal'].dropna().iloc[-1]
