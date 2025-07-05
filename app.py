@@ -13,6 +13,41 @@ import streamlit.components.v1 as components
 
 st.set_page_config(page_title="📈 Smart Stock News Analyzer", layout="wide")
 
+# 💅 Custom Styles for Visual Appeal
+st.markdown("""
+<style>
+    body {
+        background: linear-gradient(120deg, #f0f4f8 0%, #e0ffe0 50%, #ffe0e0 100%);
+    }
+    .stApp {
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    .stExpander {
+        background-color: #ffffff;
+        border-radius: 12px;
+        padding: 10px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    }
+    .news-icon::before {
+        content: "📌 ";
+    }
+    .fade-in {
+        animation: fadeIn 0.8s ease-in;
+    }
+    @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# 📰 Optional ticker tape
+components.html("""
+<marquee behavior="scroll" direction="left" style="background:#f8f8f8;color:#333;font-size:16px;padding:6px;border-bottom:1px solid #ccc;">
+📢 Latest Updates: Market sentiment and impact analysis for Nifty 100 & Next 50 stocks now live. | 💹 Monitor technical trends with 1-min refresh. | 🔍 Click on news to view impact score breakdown.
+</marquee>
+""", height=32)
+
 # Initialize session state to handle view switching
 if 'view' not in st.session_state:
     st.session_state.view = 'news'
@@ -181,9 +216,12 @@ if st.session_state.view == 'technical':
     st.title("📉 Technical Analysis")
     if stock_input:
         try:
-            data = yf.download(stock_input, period="1d", interval="1m")
+            symbol = stock_input.strip().upper()
+            if not symbol.endswith(".NS"):
+                symbol += ".NS"
+            data = yf.download(symbol, period="1d", interval="1m")
             if not data.empty:
-                st.subheader(f"1-Day Intraday Price Chart for {stock_input.upper()}")
+                st.subheader(f"1-Day Intraday Price Chart for {symbol}")
                 st.line_chart(data['Close'])
 
                 delta = data['Close'].diff()
@@ -243,6 +281,7 @@ elif st.session_state.view == 'news':
 
             label = f"{news['Color']} {news['Stock']} — Impact Score: {news['Impact Score']} — {rsi_color} RSI = {rsi}"
             with st.expander(label):
+                st.markdown("<div class='fade-in'>", unsafe_allow_html=True)
                 st.write(f"**Headline:** {news['Headline']}")
                 st.write(f"**Summary:** {news['Summary']}")
                 st.write(f"**Sentiment Score:** {news['Sentiment']}")
@@ -250,5 +289,6 @@ elif st.session_state.view == 'news':
                 st.write(f"**Reported By:** {news['Sources Count']} source(s): {news['Source']}")
                 st.write(f"**Scoring Formula:** `0.3 × Sentiment + 0.7 × Impact Weight = {news['Raw Score']}`")
                 st.write(f"**Source:** [{news['Source'].split(',')[0]}]({news['Link']})")
+                st.markdown("</div>", unsafe_allow_html=True)
     else:
         st.warning("No impactful news found today.")
