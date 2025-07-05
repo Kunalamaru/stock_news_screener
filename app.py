@@ -328,11 +328,11 @@ elif st.session_state.view == 'news':
                 st.write(f"**Scoring Formula:** `0.3 × Sentiment + 0.7 × Impact Weight = {news['Raw Score']}`")
                 st.write(f"**Source:** [{news['Source'].split(',')[0]}]({news['Link']})")
                 if '🦬' in trend_icon:
-    st.image("https://cdn-icons-png.flaticon.com/512/616/616408.png", width=60, caption="Bullish")
+                    st.image("https://cdn-icons-png.flaticon.com/512/616/616408.png", width=60, caption="Bullish")
                 elif '🐻' in trend_icon:
-    st.image("https://cdn-icons-png.flaticon.com/512/616/6164086.png", width=60, caption="Bearish")
+                    st.image("https://cdn-icons-png.flaticon.com/512/616/6164086.png", width=60, caption="Bearish")
                 else:
-    st.image("https://cdn-icons-png.flaticon.com/512/616/6164083.png", width=60, caption="Neutral")
+                    st.image("https://cdn-icons-png.flaticon.com/512/616/6164083.png", width=60, caption="Neutral")
                 st.markdown("</div>", unsafe_allow_html=True)
     else:
         st.warning("No impactful news found today.")
