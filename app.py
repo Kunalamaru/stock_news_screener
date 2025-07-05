@@ -13,6 +13,19 @@ import streamlit.components.v1 as components
 
 st.set_page_config(page_title="📈 Smart Stock News Analyzer", layout="wide")
 
+# 🌄 Background Image Setup for News & Technical Pages
+st.markdown("""
+<style>
+    .stApp {
+        background-image: url('https://images.unsplash.com/photo-1554224154-22dec7ec8818');
+        background-size: cover;
+        background-attachment: fixed;
+        background-repeat: no-repeat;
+        background-position: center;
+    }
+</style>
+""", unsafe_allow_html=True)
+
 # 💅 Custom Styles for Visual Appeal
 st.markdown("""
 <style>
@@ -161,6 +174,22 @@ def get_rsi(symbol):
     except:
         return 50
 
+def get_analyst_calls(stock_symbol):
+    try:
+        url = f"https://www.moneycontrol.com/stocks/company_info/stock_quotes.php?sc_id={stock_symbol}&durationType=5&scat=&sel_tab=1"
+        response = requests.get(url, timeout=10)
+        soup = BeautifulSoup(response.content, "html.parser")
+        summary_div = soup.find('div', class_='mctext')
+        if summary_div:
+            text = summary_div.get_text().lower()
+            buy = text.count("buy")
+            hold = text.count("hold")
+            sell = text.count("sell")
+            return f"Buy = {buy}, Hold = {hold}, Sell = {sell}"
+    except:
+        pass
+    return "Buy = ?, Hold = ?, Sell = ?"
+
 def analyze_news(raw):
     results = []
     seen = set()
@@ -201,6 +230,12 @@ st.sidebar.header("📌 Technical Analysis")
 stock_input = st.sidebar.text_input("Enter stock symbol (e.g., INFY.NS):")
 st.session_state.auto_refresh = st.sidebar.toggle("⟳ Auto Refresh (1 min)", value=st.session_state.auto_refresh)
 if st.sidebar.button("Generate Technical Analysis"):
+    st.session_state.trigger_transition = True
+    st.session_state.view = 'technical'
+
+if st.sidebar.button("🔙 Back to News"):
+    st.session_state.trigger_transition = True
+    st.session_state.view = 'news'
     st.session_state.trigger_transition = True
     st.session_state.view = 'technical'
 
@@ -280,7 +315,9 @@ elif st.session_state.view == 'news':
                 rsi = "NA"
                 rsi_color = '⚪'
 
-            label = f"{news['Color']} {news['Stock']} — Impact Score: {news['Impact Score']} — {rsi_color} RSI = {rsi}"
+            trend_icon = "🦬" if rsi > 70 else "🐐" if 30 <= rsi <= 70 else "🐻"
+            calls_info = get_analyst_calls(news['Stock'])
+            label = f"{news['Color']} {news['Stock']} — Impact Score: {news['Impact Score']} — {rsi_color} RSI = {rsi} {trend_icon} — {calls_info}"
             with st.expander(label):
                 st.markdown("<div class='fade-in'>", unsafe_allow_html=True)
                 st.write(f"**Headline:** {news['Headline']}")
@@ -290,6 +327,12 @@ elif st.session_state.view == 'news':
                 st.write(f"**Reported By:** {news['Sources Count']} source(s): {news['Source']}")
                 st.write(f"**Scoring Formula:** `0.3 × Sentiment + 0.7 × Impact Weight = {news['Raw Score']}`")
                 st.write(f"**Source:** [{news['Source'].split(',')[0]}]({news['Link']})")
+                if '🦬' in trend_icon:
+                    st.image("https://media.giphy.com/media/6Xk3CRXG5yLLa/giphy.gif", width=60, caption="Bullish")
+                elif '🐻' in trend_icon:
+                    st.image("https://media.giphy.com/media/mq5y2jHRCAqMo/giphy.gif", width=60, caption="Bearish")
+                else:
+                    st.image("https://media.giphy.com/media/Ii8x0oCHN9ZzS/giphy.gif", width=60, caption="Neutral")
                 st.markdown("</div>", unsafe_allow_html=True)
     else:
         st.warning("No impactful news found today.")
