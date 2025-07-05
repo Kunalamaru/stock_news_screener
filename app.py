@@ -17,7 +17,7 @@ st.set_page_config(page_title="📈 Smart Stock News Analyzer", layout="wide")
 st.markdown("""
 <style>
     .stApp {
-        background-image: url('https://images.unsplash.com/photo-1554224154-22dec7ec8818');
+        background-image: url('https://images.unsplash.com/photo-1569025696738-9786aa05c1d2?auto=format&fit=crop&w=1600&q=80');
         background-size: cover;
         background-attachment: fixed;
         background-repeat: no-repeat;
